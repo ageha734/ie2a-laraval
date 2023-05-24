@@ -37,7 +37,14 @@ RUN apt-get update \
     # libzip-devはzip圧縮時に必要となるライブラリ(libzip は、zlib を使用する)
     # docker-php-ext-installはPHPに標準で備わっている拡張パッケージのインストール＆有効化ができるコマンド
     # PDO_MYSQL は、PHP から MySQL データベースへのアクセスを可能にするための PHP Data Objects (PDO) インターフェイス を実装したドライバ。
-    && apt-get install -y vim mariadb-client libzip-dev docker-php-ext-install zip uzip pdo_mysql \
+    && apt-get install -y vim mariadb-client libzip-dev 
+
+RUN docker-php-ext-install mysqli
+
+RUN docker-php-ext-install pdo_mysql zip 
+
+
+RUN apt-get install  zip unzip  \
     # git make locales のインストール
     && apt-get install -y git make \
     # xdebugのインストール
@@ -66,7 +73,8 @@ ENV COMPOSER_HOME /composer
 ENV PATH $PATH:/composer/vendor/bin
 
 # nodeインストール(aptだとNodejsは古いため、パッケージマネージャの n を使用してインストール)
-RUN apt install -y npm \
+
+RUN apt update && apt install -y npm \
     && npm install n -g \
     && n stable
 
