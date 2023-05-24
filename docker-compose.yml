@@ -1,0 +1,139 @@
+version: "3.8"
+
+services: 
+  web:
+    cgroup_parent: LEMP
+    container_name: InsuLAN.web-dl
+    hostname: InsuLAN.Web 
+    build:
+      context: ./.docker/nginx/.
+      dockerfile: Dockerfile
+    restart: always
+    volumes:
+      - ./:/var/www
+    networks:
+      InsuLAN:
+        ipv4_address: 192.168.1.100
+        priority: 1000
+    ports:
+      - target: 80
+        published: 18080
+        protocol: tcp
+        mode: host
+    depends_on:
+      app:
+        condition: service_started
+  app:
+    cgroup_parent: LEMP
+    container_name: InsuLAN.app-dl
+    hostname: InsuLAN.Laravel
+    build:
+      context: ./.docker/php/.
+      dockerfile: Dockerfile
+      args:
+        docker_uid: ${DOCKER_UID:?err}
+        docker_gid: ${DOCKER_GID:?err}
+        docker_user: ${DOCKER_USER:?err}
+        docker_groups: ${DOCKER_GROUPS:?err}
+        docker_password: ${DOCKER_PASSWORD:?err}
+    restart: on-failure
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/home/${DOCKER_USER:?err}/${DOCKER_USER:?err}
+    networks:
+      InsuLAN:
+        ipv4_address: 192.168.1.101
+        priority: 1000
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    cgroup_parent: LEMP
+    container_name: InsuLAN.db-dl
+    hostname: InsuLAN.Mysql
+    build:
+      context: ./.docker/mysql/.
+      dockerfile: Dockerfile
+    healthcheck:
+      test: mysqladmin ping -h 127.0.0.1 -u$DB_USERNAME -p$DB_PASSWORD
+      interval: 1s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:?err}
+      MYSQL_USER: ${DB_USERNAME:?err}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?err}
+    volumes:
+      - type: volume
+        source: mysql-data
+        target: /var/lib/mysql
+    networks:
+      InsuLAN:
+        ipv4_address: 192.168.1.102
+        priority: 1000
+    depends_on:
+      phpmyadmin:
+        condition: service_started
+      mailcatcher:
+        condition: service_started
+  phpmyadmin:
+    cgroup_parent: LEMP
+    container_name: InsuLAN.phpmyadmin-dl
+    hostname: InsuLAN.phpmyadmin 
+    image: phpmyadmin/phpmyadmin
+    restart: always
+    environment:
+      - PMA_ARBITRARY=1
+      - PMA_HOST=db
+      - PMA_USER=${DB_USERNAME:?err}
+      - PMA_PASSWORD=${DB_PASSWORD:?err}
+    volumes:
+      - /sessions
+    links:
+      - db
+    networks:
+      InsuLAN:
+        ipv4_address: 192.168.1.200
+        priority: 1000
+    ports:
+      - target: 80
+        published: 8580
+        protocol: tcp
+        mode: host
+
+  mailcatcher:
+    cgroup_parent: LEMP
+    container_name: InsuLAN.mailcatcher-dl
+    hostname: InsuLAN.mailcatcher 
+    image: schickling/mailcatcher
+    restart: always
+    networks:
+      InsuLAN:
+        ipv4_address: 192.168.1.201
+        priority: 1000
+    ports:
+      - target: 1080
+        published: 1080
+        protocol: tcp
+        mode: host
+
+networks:
+  InsuLAN:
+    driver: bridge
+    enable_ipv6: false
+    driver_opts:
+      com.docker.network.enable_ipv6: "false"
+    name: InsuLAN.Network
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.1.0/24
+          gateway: 192.168.1.2
+
+volumes:
+  mysql-data:
+    name: mysql.data.repository
+    driver: local
